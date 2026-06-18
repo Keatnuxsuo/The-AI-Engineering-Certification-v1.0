@@ -1,3 +1,5 @@
+
+
 Knowledge Graph = Management of knowlegde triple
 
 Entities= Noun
@@ -12,3 +14,5 @@ Duplication / Expired knowledge
 - algorithm to resolve conflict that's no longer relevant
 - apply timestamp, ignore knowledge older than a specific knowledge
 - Time weighted scoring algorithm (weight the result of the knowledge based on how recent)
+
+Would be good for evergreen knowledge, rarely changing
