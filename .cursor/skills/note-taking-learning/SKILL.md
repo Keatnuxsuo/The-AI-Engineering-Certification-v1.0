@@ -2,11 +2,11 @@
 name: note-taking-learning
 description: >-
   Creates learning journals, reflection notes, study notes, unclear-concept
-  lists, post-task teaching debriefs, active recall questions, and next
-  experiments from AI tutoring conversations. Use when the user invokes
+  lists, code anchors, post-task teaching debriefs, active recall questions,
+  and next experiments from AI tutoring conversations. Use when the user invokes
   /note-taking-learning, asks to reflect on a conversation, create study notes,
-  identify unclear concepts, explain roads not taken, or apply Plan Explore
-  Experiment Reflect to AI engineering learning.
+  identify unclear concepts, explain roads not taken, preserve key code
+  snippets, or apply Plan Explore Experiment Reflect to AI engineering learning.
 disable-model-invocation: true
 ---
 
@@ -35,9 +35,10 @@ Do not merely summarize the conversation. Extract what changed in the learner's 
    - vague use of technical terms
    - missing links between concept, code, and real AI systems
    - errors or surprising outputs that revealed a misunderstanding
-4. Convert the conversation into a Plan, Explore, Experiment, Reflect journal.
-5. For substantial tasks, add a post-task teaching debrief that explains reasoning, alternatives, tradeoffs, mistakes, expert insights, and transferable lessons.
-6. End with active recall questions, a small next experiment, and a spaced review suggestion.
+4. Capture short code anchors when a snippet, API call, error, or data shape is central to the learning.
+5. Convert the conversation into a Plan, Explore, Experiment, Reflect journal.
+6. For substantial tasks, add a post-task teaching debrief that explains reasoning, alternatives, tradeoffs, mistakes, expert insights, and transferable lessons.
+7. End with active recall questions, a small next experiment, and a spaced review suggestion.
 
 ## Post-Task Teaching Debrief
 
@@ -58,6 +59,28 @@ Cover these points when evidence is available:
 - Transferable lessons: principles the learner can apply to different projects.
 
 Do not invent hidden reasoning or fake mistakes. If an alternative, tradeoff, or dead end was not visible in the conversation, frame it as "a likely alternative would have been..." or ask a follow-up question.
+
+## Code Anchors
+
+Use code snippets as memory anchors, not as a second codebase inside the journal.
+
+Include a code anchor when it captures:
+
+- the key API call, data shape, or function behavior the learner misunderstood
+- a small before/after change that explained the behavior
+- a confusing LangGraph state update, retrieval call, evaluator input, or prompt pattern
+- a short error message or traceback line that revealed the root cause
+- an output example that makes an abstract concept concrete
+
+Keep code anchors short. Prefer 1-8 lines, or a focused excerpt with surrounding explanation. Avoid full notebook cells, full functions, assignment solutions, secrets, API keys, private data, or copied code without explanation.
+
+For each code anchor, explain:
+
+- What this snippet does
+- Why this line or pattern matters
+- What the learner predicted would happen
+- What actually happened
+- The reusable rule or debugging lesson
 
 ## Output Template
 
@@ -81,6 +104,8 @@ Use this structure unless the user asks for a different format:
 
 ## Experiment
 - Code, notebook, or prompt activity:
+- Code anchor, if useful:
+- Why the snippet matters:
 - Prediction before running or reasoning:
 - Result, error, or observation:
 - Debugging insight:
@@ -118,7 +143,7 @@ Apply these principles when shaping the notes:
 A concept is not "learned" just because it was mentioned. For each important concept, capture at least one of:
 
 - a plain-English explanation
-- a code or API behavior described in words
+- a short code anchor or API behavior described in words
 - a failure mode or common mistake
 - an active recall question
 - a next experiment

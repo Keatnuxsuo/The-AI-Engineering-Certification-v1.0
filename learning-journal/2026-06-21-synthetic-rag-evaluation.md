@@ -137,6 +137,165 @@
   - Created a custom robustness judge prompt because `ROBUSTNESS_PROMPT` is not built into `openevals.prompts`.
   - Pulled compact trace-style results from LangSmith/CSV and added token fields for cost inspection.
 
+- Code anchors:
+  - Ragas node creation:
+
+    ```python
+    Node(
+        type=NodeType.CHUNK,
+        properties={
+            "page_content": chunk.page_content,
+            "document_metadata": dict(chunk.metadata),
+        },
+    )
+    ```
+
+    - What this snippet does: Wraps each loaded PDF page/chunk in the data shape Ragas expects.
+    - Why it matters: Ragas cannot enrich a raw string directly with summaries, embeddings, themes, entities, and relationships in a structured way.
+    - What I predicted: The graph could just store raw strings or JSON.
+    - What actually happened: Ragas uses `Node` objects in memory, then can serialize the graph to JSON later.
+    - Reusable rule: Data model first, serialization format second. JSON is storage; `Node` is the object Ragas operates on.
+
+  - Graph enrichment output:
+
+    ```text
+    Before: KnowledgeGraph(nodes=20, relationships=0)
+    After:  Node properties include summary, summary_embedding, themes, entities
+    ```
+
+    - What this output shows: The graph starts as isolated text chunks, then gains properties and relationships after transforms.
+    - Why it matters: “Enrichment” means more than adding relationships; it also adds useful node-level features.
+    - What I predicted: Enrichment mainly meant building relationships.
+    - What actually happened: Ragas added both node properties and graph relationships.
+    - Reusable rule: In graph-based pipelines, node attributes and edges both carry signal.
+
+  - Synthetic test generation:
+
+    ```python
+    synthetic_testset = testset_generator.generate(
+        testset_size=TESTSET_SIZE,
+        query_distribution=query_distribution,
+        run_config=ragas_run_config,
+    )
+    ```
+
+    - What this snippet does: Uses the enriched graph plus query distribution to generate synthetic questions, reference contexts, and reference answers.
+    - Why it matters: This is not the RAG app answering yet; it is creating the evaluation dataset.
+    - What I predicted: Once the knowledge graph existed, this was the “RAG retrieval” step.
+    - What actually happened: It generated test examples for later RAG evaluation.
+    - Reusable rule: Separate test-set generation from application inference.
+
+  - LCEL answer chain:
+
+    ```python
+    answer_chain = rag_prompt | rag_llm | StrOutputParser()
+    ```
+
+    - What this snippet does: Creates a simple LangChain Expression Language pipeline: prompt -> model -> string output.
+    - Why it matters: Retrieval is not inside this chain; retrieved context is passed into it later.
+    - What I predicted: This cell might already be the full RAG app.
+    - What actually happened: It was only the answer-generation part of RAG.
+    - Reusable rule: In RAG, separate retrieval, context formatting, and answer generation when debugging.
+
+  - RAG target output contract:
+
+    ```python
+    return {
+        "answer": answer,
+        "contexts": contexts,
+        "retrieval_k": retrieval_k,
+    }
+    ```
+
+    - What this snippet does: Returns the generated answer plus retrieved contexts in a predictable shape.
+    - Why it matters: The evaluators later depend on `outputs["answer"]` and `outputs["contexts"]`.
+    - What I predicted: The target only needed to return the final answer.
+    - What actually happened: Returning contexts enables groundedness and retrieval relevance evaluation.
+    - Reusable rule: Evaluation-friendly functions should expose intermediate evidence, not just final outputs.
+
+  - Evaluator wrapper:
+
+    ```python
+    def answer_correctness(inputs, outputs, reference_outputs):
+        return correctness_judge(
+            inputs=inputs["question"],
+            outputs=outputs["answer"],
+            reference_outputs=reference_outputs["answer"],
+        )
+    ```
+
+    - What this snippet does: Adapts LangSmith’s dictionary-shaped inputs to the fields the judge prompt expects.
+    - Why it matters: `correctness_judge` cannot be passed directly unless its expected arguments match LangSmith’s evaluator interface.
+    - What I predicted: The output of `correctness_judge` needed to be reshaped.
+    - What actually happened: The main job was input mapping; the judge result is returned to LangSmith.
+    - Reusable rule: Wrappers often adapt interfaces, not business logic.
+
+  - Chunking experiment correction:
+
+    ```python
+    student_vector_store = QdrantVectorStore.from_documents(
+        documents=student_documents,
+        embedding=rag_embeddings,
+        location=":memory:",
+        collection_name=f"cat_health_eval_{uuid4().hex[:8]}",
+    )
+    ```
+
+    - What this snippet does: Builds a new vector store from the new chunking strategy while reusing the same embedding model.
+    - Why it matters: Using `rag_documents` here would silently reuse the old 500/75 chunks and invalidate the experiment.
+    - What I predicted: Reusing `rag_documents` and `rag_embeddings` might both be okay.
+    - What actually happened: Only `rag_embeddings` should be reused; `student_documents` must change because chunking is the tested variable.
+    - Reusable rule: In controlled experiments, reuse only the variables you intend to keep fixed.
+
+  - Vector-store-aware target factory:
+
+    ```python
+    def make_rag_target_for_store(vector_store_to_use, retrieval_k):
+        retriever = vector_store_to_use.as_retriever(
+            search_kwargs={"k": retrieval_k}
+        )
+    ```
+
+    - What this snippet does: Makes the target use the vector store passed in, rather than a global `vector_store`.
+    - Why it matters: If the helper closes over the old global vector store, the “new” experiment may still retrieve from the old index.
+    - What I predicted: Calling `make_rag_target(student_retrieval_k)` would use the new store.
+    - What actually happened: The original helper used the global vector store, so the helper needed a store parameter.
+    - Reusable rule: Watch for hidden global state when running experiments.
+
+  - Robustness expected behavior:
+
+    ```python
+    {
+        "question": "What is the capital of the moon?",
+        "expected_behavior": (
+            "The assistant should say the corpus does not provide enough "
+            "information and should not invent an answer."
+        ),
+    }
+    ```
+
+    - What this snippet does: Defines the desired safe behavior for an unrelated question.
+    - Why it matters: The first version incorrectly expected a veterinarian recommendation, which did not fit a non-medical question.
+    - What I predicted: A generic “recommend a veterinarian” expectation was safe for all robustness cases.
+    - What actually happened: The judge gave partial credit because the expected behavior was mismatched.
+    - Reusable rule: Robustness expected behavior must be case-specific, or the evaluator can punish correct behavior.
+
+  - Compact trace table fields:
+
+    ```python
+    {
+        "inputs": run.inputs.get("question"),
+        "outputs": (run.outputs or {}).get("answer"),
+        "total_tokens": run.total_tokens,
+    }
+    ```
+
+    - What this snippet does: Builds a compact table similar to LangSmith’s UI instead of showing every raw CSV column.
+    - Why it matters: Evaluation review needs readable trace summaries plus cost signals.
+    - What I predicted: Pulling runs/traces directly would automatically look like the UI.
+    - What actually happened: The SDK returns rich objects, so I needed to select fields intentionally.
+    - Reusable rule: Build task-specific observability views; raw logs are too noisy for learning or diagnosis.
+
 - Prediction before running or reasoning:
   - Increasing `k` from 3 to 6 should improve correctness when useful evidence is missing from the top 3 chunks.
   - Larger chunks should improve local evidence completeness because each retrieved chunk covers more of a section.

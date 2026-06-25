@@ -62,6 +62,75 @@
   - Began a reusable runner: JSONL case -> agent run -> Ragas trace -> metric row.
   - Attempted LangSmith tracing and identified setup friction.
 
+- Code anchors:
+  - LangGraph state handoff in the RAG graph:
+
+    ```python
+    def retrieve(state: RAGState):
+        return {"context": retriever.invoke(state["question"])}
+
+    def generate(state: RAGState):
+        context_text = "\n\n".join(
+            document.page_content for document in state["context"]
+        )
+    ```
+
+    What this does: `retrieve()` writes retrieved documents into the graph state under `"context"`, and `generate()` reads that same state key later.
+
+    Why it matters: this corrected the confusion about how `generate()` "knows" about retrieved context. The reusable rule is: LangGraph nodes do not need to call each other directly; they pass data through state updates.
+
+  - Agent routing based on tool-call requests:
+
+    ```python
+    def should_continue(state: AgentState):
+        last_message = state["messages"][-1]
+        return "tools" if getattr(last_message, "tool_calls", []) else END
+    ```
+
+    What this does: after the assistant responds, the graph checks whether the latest AI message requested any tool calls. If yes, it routes to `ToolNode`; otherwise, the graph ends.
+
+    Why it matters: this clarified the difference between an AI message that requests a tool call and the tool message that contains the executed result.
+
+  - Ragas knowledge graph location:
+
+    ```python
+    kg = testset_generator.knowledge_graph
+    len(kg.nodes), len(kg.relationships)
+    ```
+
+    What this does: accesses the intermediate Ragas graph after `generate_with_chunks(...)` has run.
+
+    Why it matters: the final `synthetic_testset` is not the graph. Ragas stores the enriched graph on the generator object, which explained why there was no obvious `knowledge_graph` variable in the notebook.
+
+  - Tool-call references come from the JSONL expected field:
+
+    ```python
+    def reference_tool_calls_from_case(case):
+        return [
+            RagasToolCall(
+                name=tool_call["name"],
+                args=dict(tool_call.get("args") or {}),
+            )
+            for tool_call in case["reference_tool_calls"]
+        ]
+    ```
+
+    What this does: converts expected tool-call dictionaries from the JSONL case into Ragas `ToolCall` objects.
+
+    Why it matters: `case["messages"]` contains only the user input transcript. Expected tool calls live in `case["reference_tool_calls"]`. Actual tool calls only exist after the agent runs and produces a trace.
+
+  - One-case runner shape:
+
+    ```python
+    messages = run_case(agent, case)
+    trace = to_ragas_messages(messages)
+    reference_tool_calls = reference_tool_calls_from_case(case)
+    ```
+
+    What this does: runs one case through one agent, converts the resulting conversation into a Ragas trace, and prepares the expected tool calls.
+
+    Why it matters: this separated one-case scoring from many-case looping. The reusable rule is: make the inner function handle one case cleanly, then use an outer loop to run the whole JSONL suite.
+
 - Prediction before running or reasoning:
   - Increasing MMR diversity might improve entity coverage but add noise.
   - Guarded prompt should improve scope safety.
