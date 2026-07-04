@@ -155,7 +155,7 @@ Why is OAuth important for MCP servers, and what security considerations should 
 
 #### Answer
 
-_(insert your answer here)_
+OAuth is important for MCP servers because it lets the server verify which client/user is requesting access and what permissions they have. This matters because MCP tools may expose sensitive data or perform actions like modifying a cart, querying private systems or making purchases. When exposing tools to AI clients, we should use scoped permissions, validate inputs, avoid overly powerful tools, protect tokens, and make sure destructive actions require clear user intent.
 
 ### Question #2
 
@@ -163,7 +163,7 @@ What is Streamable HTTP transport in MCP, and why might you expose a server publ
 
 #### Answer
 
-_(insert your answer here)_
+Streamable HTTP is an MCP transport protocol that lets a client communicate with an MCP server over HTTP instead of local standard input/output. This is useful when the MCP client is remote, such as ChatGPT or another hosted agent, because it can't directly access a local stdio process on my machine. If the server is exposed publicly, OAuth is needed to control which clients/users can connect and what actions they are allowed to perform.
 
 ## Activity 1: Extend the MCP Server
 
@@ -174,3 +174,40 @@ Add at least one new tool to the cat shop MCP server (e.g., `search_products`, `
 Build a custom MCP client that connects to the cat shop server over Streamable HTTP, authenticates via OAuth, and orchestrates a multi-step shopping flow (browse → add to cart → checkout). Compare the developer experience of MCP-based tool integration vs. traditional REST API calls.
 
 Include your findings and a demo in your Loom video.
+
+While building the Cat Shop server, I integrated the Auspost PAC API two ways: as raw REST calls inside my server, and as an MCP tool exposed to an LLM client. That gave me a direct comparison
+
+Tool discovery
+- REST: I had to read the AusPost PAC reference docs, guess the query params (from_postcode, weight, service_code…), and confirm them by trial and error. Discovery is a human, out-of-band task.
+- MCP: The client calls list_tools() and gets every tool + JSON schema at runtime. When I added estimate_shipping, the client discovered it automatically — no doc reading.
+
+Authentication
+- REST: I attached AUTH-KEY to every request myself and guarded the missing-key case in code.
+- MCP: Auth is handled once by the transport. My OAuth server issues a token; the client attaches it to all tool calls. Individual tools never touch auth.
+
+Schema & validation
+- REST: Request params were hand-built dicts, and I parsed the nested response (postage_result.total_cost) manually, casting types by hand.
+- MCP: FastMCP generated the input JSON Schema from my Python type hints (country: str | None, weight: float | None). The client validates arguments before they ever reach my code.
+
+Error handling & human-in-the-loop
+- REST: I checked status_code and dug error.errorMessage out of the payload.
+- MCP: I returned structured results the model understands, including a need_input signal that makes the assistant ask the user for a missing postcode instead of guessing. That conversational fallback has no clean REST equivalent.
+
+LLM integration
+- REST: To let an LLM use the AusPost API, I'd have to write function-calling wrappers, schemas, and glue for each endpoint.
+- MCP: The tools dropped straight into a LangChain agent (Loaded LangChain tools: … estimate_shipping). Zero per-tool glue.
+
+Coupling & maintenance
+- REST: Each API is its own client, base URL, and auth scheme.
+- MCP: One session exposes many tools over a uniform interface. The trade-off I hit: because discovery is at connection time, a stale cached tool list meant a client didn't see estimate_shipping until it reconnected — a maintenance quirk REST doesn't have (but REST pays for it with manual doc-syncing instead).
+
+Takeaway: These aren't competing protocols so much as different interaction models for different consumers. REST exposes fixed endpoints and remains the default for service-to-service and app backends. MCP layers a discoverable, self-describing tool interface (often on top of HTTP) aimed at LLM/agent consumers. In my build they were complementary — AusPost stayed a REST API and MCP wrapped it as the agent-facing layer — but that's a design choice, not a rule: agents can call REST directly, and MCP shines mainly when we have many tools or multiple agent clients that benefit from runtime discovery and a uniform interface.
+
+The mature pattern is a hybrid, and it mirrors how MCP is meant to be used:
+
+- Deterministic steps → direct call_tool. Anything with a fixed sequence, money, or side effects (add to cart, checkout) should be explicit code we control not left to model discretion. I probably never want an LLM deciding on its own to call checkout without approval in real application
+
+- Open-ended steps → agent. "Find me a good toy under $10 for a kitten" is genuinely a reasoning task — let the agent choose list_products / get_product.
+
+- Guardrails regardless of layer. The server already enforces this well: checkout and add_to_cart require auth via _get_username(), and the client system prompt says "Only call checkout when the user explicitly asks." That instruction is a soft guard; the hard guard is keeping destructive actions in deterministic code.
+

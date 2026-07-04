@@ -7,6 +7,11 @@ from mcp.server.auth.middleware.auth_context import get_access_token
 from .server import mcp, oauth_provider
 
 
+def _need_input(missing: list[str], question: str) -> dict:
+    """Structured signal telling the client to ask the user for missing info."""
+    return {"status": "need_input", "missing": missing, "question": question}
+
+
 async def _get_username() -> str:
     token = get_access_token()
     if token is None:
@@ -147,6 +152,19 @@ async def view_cart() -> dict:
     return {"items": items, "total": total, "item_count": len(items)}
 
 
+async def _get_cart_weight(username: str) -> float:
+    """Total weight (kg) of all items in the user's cart, quantity-adjusted."""
+    db = await oauth_provider._get_db()
+    cursor = await db.execute(
+        """SELECT COALESCE(SUM(p.weight_kg * c.quantity), 0)
+           FROM cart_items c JOIN products p ON c.product_id = p.id
+           WHERE c.username = ?""",
+        (username,),
+    )
+    (weight,) = await cursor.fetchone()
+    return round(float(weight), 3)
+
+
 @mcp.tool()
 async def remove_from_cart(product_id: int) -> dict:
     """Remove a product from your shopping cart."""
@@ -163,14 +181,39 @@ async def remove_from_cart(product_id: int) -> dict:
 
 
 @mcp.tool()
-async def checkout() -> dict:
-    """Complete your purchase. Shows order summary and clears the cart."""
+async def checkout(country: str | None = None, postcode: str | None = None) -> dict:
+    """Complete your purchase, including AusPost shipping in the total.
+
+    Provide the destination so shipping is added to the order:
+    - Domestic: country='AU' plus postcode (e.g. Perth=6000, Melbourne=3000).
+    - International: 2-letter country code (e.g. NZ, US) and omit postcode.
+
+    Shipping is calculated for the whole cart based on total item weight.
+    Do NOT guess the destination. If country/postcode are missing, this tool
+    returns a "need_input" question for you to ask the user before charging.
+    """
     username = await _get_username()
     db = await oauth_provider._get_db()
 
     cart = await view_cart()
     if not cart["items"]:
         return {"error": "Your cart is empty"}
+
+    items_total = cart["total"]
+
+    cart_weight = await _get_cart_weight(username)
+    shipping = await _calculate_shipping(
+        country,
+        postcode=postcode,
+        weight=cart_weight,
+    )
+    if shipping.get("status") == "need_input":
+        return shipping
+    if "error" in shipping:
+        return {"error": f"Could not calculate shipping: {shipping['error']}"}
+    shipping_cost = shipping["total_cost"]
+
+    grand_total = round(items_total + shipping_cost, 2)
 
     await db.execute("DELETE FROM cart_items WHERE username = ?", (username,))
     await db.commit()
@@ -180,7 +223,15 @@ async def checkout() -> dict:
         "order_id": order_id,
         "status": "confirmed",
         "items": cart["items"],
-        "total": cart["total"],
+        "items_total": items_total,
+        "shipping_cost": round(shipping_cost, 2),
+        "grand_total": grand_total,
+        "currency": "AUD",
+        "shipping": {
+            "service": shipping.get("service"),
+            "delivery_time": shipping.get("delivery_time"),
+            "destination": postcode or shipping.get("country"),
+        },
         "message": f"Order {order_id} confirmed! Thanks {username}, your cats will love their new goodies!",
     }
 
@@ -227,9 +278,8 @@ def _pick_service_code(services_payload: dict) -> str | None:
     return services[0].get("code")
 
 
-@mcp.tool()
-async def estimate_shipping(
-    country: str,
+async def _calculate_shipping(
+    country: str | None = None,
     postcode: str | None = None,
     product_id: int | None = None,
     weight: float | None = None,
@@ -237,19 +287,16 @@ async def estimate_shipping(
     width_cm: float | None = None,
     height_cm: float | None = None,
 ) -> dict:
-    """Get AusPost postage cost and delivery time for a cat shop parcel.
-
-    ALWAYS use this tool when the user asks about shipping cost, delivery price,
-    or postage to a city/postcode/country. Pass product_id from get_product so
-    the correct weight and dimensions are used automatically.
-
-    Domestic Australia: country='AU' or 'Australia' plus destination postcode
-    (e.g. Perth=6000, Melbourne=3000, Sydney=2000).
-    International: 2-letter country code (e.g. NZ, US, GB) and omit postcode.
-    """
     api_key = os.getenv("AUSPOST_API_KEY")
     if not api_key:
         return {"error": "AUSPOST_API_KEY is not set"}
+
+    if not country or not country.strip():
+        return _need_input(
+            ["country"],
+            "Where should this be shipped? Give an Australian postcode for domestic "
+            "delivery, or a country (e.g. New Zealand) for international.",
+        )
 
     product_name = None
     if product_id is not None:
@@ -269,8 +316,12 @@ async def estimate_shipping(
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         if _is_domestic(country):
-            if not postcode:
-                return {"error": "postcode is required for domestic shipping"}
+            if not postcode or not str(postcode).strip():
+                return _need_input(
+                    ["postcode"],
+                    "What Australian postcode should I ship to? "
+                    "For example, Perth is 6000, Melbourne 3000, Sydney 2000.",
+                )
 
             parcel_params = {
                 "from_postcode": WAREHOUSE_POSTCODE,
@@ -348,3 +399,37 @@ async def estimate_shipping(
         "total_cost": float(total_cost),
         "currency": "AUD",
     }
+
+
+@mcp.tool()
+async def estimate_shipping(
+    country: str | None = None,
+    postcode: str | None = None,
+    product_id: int | None = None,
+    weight: float | None = None,
+    length_cm: float | None = None,
+    width_cm: float | None = None,
+    height_cm: float | None = None,
+) -> dict:
+    """Get AusPost postage cost and delivery time for a cat shop parcel.
+
+    ALWAYS use this tool when the user asks about shipping cost, delivery price,
+    or postage to a city/postcode/country. Pass product_id from get_product so
+    the correct weight and dimensions are used automatically.
+
+    Domestic Australia: country='AU' or 'Australia' plus destination postcode
+    (e.g. Perth=6000, Melbourne=3000, Sydney=2000).
+    International: 2-letter country code (e.g. NZ, US, GB) and omit postcode.
+
+    Do NOT guess the destination. If the user hasn't given a postcode/country,
+    call this tool anyway and it will return a "need_input" question to ask them.
+    """
+    return await _calculate_shipping(
+        country,
+        postcode=postcode,
+        product_id=product_id,
+        weight=weight,
+        length_cm=length_cm,
+        width_cm=width_cm,
+        height_cm=height_cm,
+    )
