@@ -1,0 +1,27 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environmentName": {
+      "value": "${AZURE_ENV_NAME}"
+    },
+    "location": {
+      "value": "${AZURE_LOCATION}"
+    },
+    "openAiApiKey": {
+      "value": "${OPENAI_API_KEY}"
+    },
+    "tavilyApiKey": {
+      "value": "${TAVILY_API_KEY}"
+    },
+    "langsmithApiKey": {
+      "value": "${LANGSMITH_API_KEY}"
+    },
+    "openAiChatModel": {
+      "value": "${OPENAI_CHAT_MODEL=gpt-5.4-mini}"
+    },
+    "openAiEmbeddingModel": {
+      "value": "${OPENAI_EMBEDDING_MODEL=text-embedding-3-small}"
+    }
+  }
+}

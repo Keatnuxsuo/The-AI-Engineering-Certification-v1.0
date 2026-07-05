@@ -1,0 +1,18 @@
+# azd project definition for the LangGraph agent server.
+# `azd up` provisions the Bicep in ./infra, builds the Dockerfile below,
+# pushes it to Azure Container Registry, and deploys it to the Container App
+# that is tagged `azd-service-name: agent-api`.
+name: agent-server
+metadata:
+  template: agent-server@0.1.0
+
+services:
+  agent-api:
+    # Build context is this folder; the image is built from the LangGraph
+    # generated Dockerfile (regenerate with `uv run langgraph dockerfile Dockerfile`).
+    project: .
+    language: py
+    host: containerapp
+    docker:
+      path: ./Dockerfile
+      context: .

@@ -15,6 +15,9 @@ uv.lock
 # LangGraph
 .langgraph_api/
 
+# Azure Developer CLI (contains per-environment secrets)
+.azure/
+
 # Node / Next.js (frontend)
 frontend/node_modules/
 frontend/.next/
