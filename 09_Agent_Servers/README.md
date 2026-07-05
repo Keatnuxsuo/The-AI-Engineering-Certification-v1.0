@@ -9,7 +9,7 @@
 
 | Session Sheet | Recording | Slides | Repo | Homework | Feedback |
 |:--------------|:----------|:-------|:-----|:---------|:---------|
-| [Agent Servers](../00_Docs/Session_Sheets/15_Agent_Servers/README.md) | | | You are here! | | |
+| [Session 9: Agent Servers & E2E Agents](https://github.com/AI-Maker-Space/The-AI-Engineering-Certification-v1.0/tree/main/00_Docs/Modules/09_Agent_servers_%26_E2E_Agents) |[Recording!](https://us02web.zoom.us/rec/share/ByhPGNz-CQ4C9k859VnRIoGPfkS4AdBzLPQiCIgEafYiDjYxtNXUjidTI1dM-79R.oCxzwNn0SyVAWj88) <br> passcode: `r14dvS$V`| [Session 9 Slides](https://canva.link/yqymnzjmzhpnyiy) | You are here! | [Session 9 Assignment](https://forms.gle/PMmqBBLZ8d8fGg1L8) | [Feedback 7/1](https://forms.gle/36tnHPpeS562DD3fA) |
 
 ## Useful Resources
 
