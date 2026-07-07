@@ -9,7 +9,7 @@ ADD . /deps/09_Agent_Servers
 # -- Installing all local dependencies --
 RUN for dep in /deps/*; do             echo "Installing $dep";             if [ -d "$dep" ]; then                 echo "Installing $dep";                 (cd "$dep" && PYTHONDONTWRITEBYTECODE=1 uv pip install --system --no-cache-dir -c /api/constraints.txt -e .);             fi;         done
 # -- End of local dependencies install --
-ENV LANGSERVE_GRAPHS='{"simple_agent": "app.graphs.simple_agent:graph"}'
+ENV LANGSERVE_GRAPHS='{"simple_agent": "app.graphs.simple_agent:graph", "agent_with_helpfulness": "app.graphs.agent_with_helpfulness:graph"}'
 
 
 
