@@ -9,6 +9,16 @@ from langchain.agents import create_agent
 MAX_ATTEMPTS = 3  # the safety valve so the loop can't run forever
 
 
+def _as_text(content) -> str:
+    """LangChain message .content can be a str OR a list of content blocks."""
+    if isinstance(content, str):
+        return content
+    return "".join(
+        part.get("text", "") if isinstance(part, dict) else str(part)
+        for part in content
+    )
+
+
 class State(MessagesState):
     attempts: int
     helpfulness: str
@@ -44,10 +54,10 @@ def judge_node(state: State) -> dict:
     judge_model = get_chat_model()
     judge_result = judge_model.invoke([
         SystemMessage(content="You judge whether the answer helpfully addresses the question. Reply with EXACTLY one character: Y or N."),
-        HumanMessage(content=f"User question: {user_message.content}\n\nAgent answer: {agent_message.content}"),
+        HumanMessage(content=f"User question: {_as_text(user_message.content)}\n\nAgent answer: {_as_text(agent_message.content)}"),
     ])
     # 3. return {"helpfulness": "Y" or "N"}
-    return {"helpfulness": judge_result.content.strip().upper()}
+    return {"helpfulness": _as_text(judge_result.content).strip().upper()}
     
 
 def route(state: State) -> str:
