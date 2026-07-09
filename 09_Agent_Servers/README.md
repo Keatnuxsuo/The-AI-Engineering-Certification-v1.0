@@ -428,7 +428,9 @@ Why does LangSmith deploy your agent as an API backend only, and why do you stil
 
 #### Answer
 
-_(insert your answer here)_
+LangSmith (via LangGraph Platform) deploys the agent as a headless backend API — it hosts the agent logic (your graphs, nodes, tools, and state/thread management) and exposes it over HTTP through endpoints like /assistants, /threads, and streaming. That's all it is: a stateless JSON service. It has no user interface — no HTML, no chat window, no buttons — so a human can't interact with it directly; only other programs can, by making API calls.
+
+That's why we still need a separate frontend like Vercel. The frontend is a distinct application (Next.js app) that provides the human-facing layer: it renders the chat UI, captures user input, streams the agent's responses back to the screen, and calls the backend API under the hood. Keeping the two separate is also good architecture — the backend is Python optimized for long-running agent workloads (Azure Container Apps), while the frontend is TypeScript/React optimized for fast, CDN-delivered web serving (Vercel). Each can be built, scaled, and deployed independently, and the same backend API could serve multiple frontends (web, mobile, etc.).
 
 ### Question #2
 
@@ -436,7 +438,9 @@ Why should the LangSmith API key live in a Next.js API route (server-side) inste
 
 #### Answer
 
-_(insert your answer here)_
+Because anything shipped to the browser is effectively public. Client-side JavaScript, network requests, and any NEXT_PUBLIC_* variables are all baked into the bundle the browser downloads, so anyone can read them with DevTools. If the LangSmith API key lived in the frontend, it would be exposed the moment someone inspects the page — and a leaked key can be abused: running up api usage and billing, and accessing my private traces and projects.
+
+Putting the key in a Next.js API route keeps it server-side, where the code runs on the server and never gets sent to the browser. The browser only ever talks to my own /api proxy route; that route injects the LangSmith API key (and the backend URL) into the request server-side before forwarding it to the LangGraph backend. The result: the key stays hidden, the client only sees my own endpoint, and my credentials and the backend address are never exposed to end users.
 
 ## Activity 1: Build a Helpfulness Loop in Production
 
