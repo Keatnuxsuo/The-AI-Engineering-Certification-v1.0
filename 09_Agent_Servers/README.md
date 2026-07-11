@@ -451,3 +451,28 @@ Build an `agent_with_helpfulness` graph that adds a post-response helpfulness ch
 Research [LangSmith Deployments custom routes](https://github.com/langchain-samples/lsd-custom-route-react-ui) and describe how you could add authentication so each user only sees their own threads. Optionally implement a simple auth gate on your Vercel frontend.
 
 Include your findings and a demo in your Loom video.
+
+
+How the reference deployment does it. The lsd-custom-route-react-ui demo runs the whole app as a single LangSmith Deployment. Its langgraph.json wires three things together: graphs (the agent), auth.path (a custom auth handler in src/auth.py), and http.app (a FastAPI app that serves the React frontend as static files from the same origin). When a user signs in, Supabase issues a JWT; the frontend sends it as Authroization: Bearer <token> on every request. The auth.py handler validates that token against Supabase and extracts the user's identity, and langgraph then automatically scopes every resource - threads, runs, assistants to that user via metadata filters. The result is that a single auth handler enforces isolation across all endpoints, so each user can only ever see their own conversations.
+
+How my architecture differs. My deployment is split into two tracks rather than one; the LangGraph agent server is self-hosted on Azure Container Apps and the Next.js frontend is deployed separately on Vercel, talking to the backend through a server-side proxy (initApiPassthrough in app/api/[...path]/route.ts). The proxy authenticates to the backend with a single shared Langsmith API key for all visitors, which means the backend currently sees every user as the same identity, so today all users share one thread space. Simple adding a login screen would not fix this because there is no per-user identity reaching the backend to scope against.
+
+The design to make each user see only their own threads. Isolation has to be split into 2 layers:
+1. Authentication (who are you?) - add supabase Auth to the Vercel frontend. The user signs in and the supabase JS SDK stores a JWT in their session
+2. Authorisation / scoping (what can you see?) - enforce identity on the backend, where the user cannot tamper with it. Add auth": { "path": "app/auth.py:auth" } to langgraph.json and implement two handlers using langgraph_sdk.Auth:
+@auth.authenticate validates the incoming JWT against Supabase and returns the user.id
+@auth.on (threads) stamps metatdata.owner = user.id when a thread is created, and adds an owner == user.id filter on reads/searches. 
+This is what turns thread owner from a cosmetic label into a real enforced ownership rule, exactly as the reference deployment does. 
+
+The critical detail for my setup. Because my frontend reaches the backend through the passthrough proxy, that proxy hop must forward both credentials: the deployment API key and the logged-in user's JWT (e.g. as the Authorisation header, derived from the server side session). If I only forward the shared key, as it works today, every user collapses back into one identity and the owner filter has nothing meaningful to bind to.
+
+Why frontend gate alone is not enough? A login screen on Vercel authenticates users but is not security boundary - a user could open DevTools and call the /api/threads proxy directly, and since the proxy uses the shared key, they would see everyone's threads. True per user isolation must be enforced server-side in the langGraph auth handler. The frontend proves identity; the backend enforces scope. Both are required.
+
+### Diagram 1 — Auth + request flow
+
+![Auth + request flow: user signs in via Supabase, the JWT is forwarded through the Next.js proxy to the LangGraph backend, which validates it and scopes thread reads/writes to the owner](./auth-flow-diagram.png)
+
+### Diagram 2 — Entity / ownership model
+
+![Entity/ownership model: USER owns THREADs (owner FK set by the auth handler), THREAD contains RUNs, ASSISTANT executes RUNs, GRAPH is instanced by ASSISTANT](./auth-er-diagram.png)
+
