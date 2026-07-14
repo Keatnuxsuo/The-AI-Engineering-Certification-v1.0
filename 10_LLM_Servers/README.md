@@ -83,7 +83,7 @@ What is the difference between serverless and dedicated endpoints?
 
 #### ✅ Answer:
 
-_(insert your answer here)_
+Serverless endpoints are provider-managed and shared: we call a model ID with no deployment, pay per use, and scaling is handled for uus. Dedicated endpoints reserve GPU capacity for our deployment, which gives more predictable performance, but we pay for compute while it's running and we own provisioning, scaling, and shutdown. The main trade-off is convenience and usage-based pricing versus guaranteed capacity and control.
 
 ### ❓ Question #2:
 
@@ -91,7 +91,7 @@ Why is it important to consider token throughput and latency when choosing an LL
 
 #### ✅ Answer:
 
-_(insert your answer here)_
+In user-facing applications, latency is how long users wait for a response, and throughput is how many tokens the model can generate per second (and how many concurrent requests it can handle). Latency directly affects user experience because chat feels broken if users wait 10+ seconds before seeing output, especially time to first token. Throughput matters for concurrency: serving many simultaneous users is harder, and low throughput leads to queueing, timeouts, and failed requests under load — so model choice must balance quality with speed, not just benchmark scores.
 
 ## Activity 1: RAGAS Evaluation with Cost Analysis
 
