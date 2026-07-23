@@ -9,7 +9,7 @@
 
 | 📰 Session Sheet | ⏺️ Recording | 🖼️ Slides | 👨‍💻 Repo | 📝 Homework | 📁 Feedback |
 |:-----------------|:-------------|:----------|:----------|:------------|:------------|
-| Session 15: Reasoning Model Fine-Tuning | Recording | Slides | You are here! | Homework | Feedback |
+| [Session 15: 📉 Fine-Tuning](https://github.com/AI-Maker-Space/The-AI-Engineering-Certification-v1.0/tree/main/00_Docs/Modules/15_Fine-Tuning) |[Recording!](https://us02web.zoom.us/rec/share/OR_pUjCUR5Io0_aaozk6Kb7tEVrrKRfuEqDFNa0Nk77BcmuquOEkWnmgy9-WODZ3.xNci5XI4OuhLqAcT) <br> passcode: `ImT6*C?D`| [Session 15 Slides](https://canva.link/0a2b2huva9cgkt2) | You are here! | [Session 15 Assignment](https://forms.gle/UPv7tonVdjQDfzGG9) | [Feedback 7/21](https://forms.gle/RbA9anGSgHCkNowNA) |
 
 ## Main Assignment
 
