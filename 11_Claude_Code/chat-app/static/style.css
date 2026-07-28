@@ -1,0 +1,324 @@
+:root {
+  --bg: #f7f7f8;
+  --surface: #ffffff;
+  --border: #e3e3e6;
+  --text: #1a1a1c;
+  --muted: #6b6b73;
+  --user-bg: #1a1a1c;
+  --user-text: #ffffff;
+  --error: #b3261e;
+  --radius: 14px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+}
+
+.shell {
+  display: flex;
+  height: 100dvh;
+  max-width: 1040px;
+  margin: 0 auto;
+  background: var(--surface);
+  border-inline: 1px solid var(--border);
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0; /* let long replies wrap instead of stretching the flex row */
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 240px;
+  flex-shrink: 0;
+  padding: 16px 12px;
+  border-right: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.new-chat {
+  padding: 9px 12px;
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+  color: inherit;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.conversations {
+  flex: 1;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.conversation {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 8px;
+}
+
+.conversation:hover {
+  background: var(--surface);
+}
+
+.conversation.active {
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.conversation-title {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  color: inherit;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  /* one line, ellipsised — titles are arbitrary user text */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.conversation-delete {
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--muted);
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.conversation:hover .conversation-delete,
+.conversation-delete:focus-visible {
+  opacity: 1;
+}
+
+.conversation-pending {
+  padding-right: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.header {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.subtitle {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.message {
+  max-width: 78%;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.message.user {
+  align-self: flex-end;
+  background: var(--user-bg);
+  color: var(--user-text);
+  border-bottom-right-radius: 4px;
+}
+
+.message.assistant {
+  align-self: flex-start;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+}
+
+.message.pending {
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* The agent's summarized reasoning, shown while it works and replaced by the answer.
+   Visually subordinate to real replies — it is process, not output. */
+.message.thinking {
+  align-self: flex-start;
+  max-width: 90%;
+  font-size: 14px;
+  font-style: italic;
+  color: var(--muted);
+  background: none;
+  border: 1px dashed var(--border);
+}
+
+/* Running list of tools the agent has used this turn. */
+.trace {
+  align-self: flex-start;
+  padding: 2px 4px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  color: var(--muted);
+}
+
+/* Answer text as it streams in. The caret marks it as still-arriving, and disappears
+   when the complete reply replaces this bubble. */
+.message.streaming::after {
+  content: "";
+  display: inline-block;
+  width: 0.5em;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: currentColor;
+  opacity: 0.7;
+  animation: caret 1s step-end infinite;
+}
+
+@keyframes caret {
+  50% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .message.streaming::after {
+    animation: none;
+  }
+}
+
+.message.error {
+  align-self: flex-start;
+  background: #fdecea;
+  border: 1px solid #f5c2bd;
+  color: var(--error);
+  border-bottom-left-radius: 4px;
+}
+
+/* Neutral, centred aside — used when the server restarted and this conversation's
+   agent-side memory was lost. Not an error: the app is working as designed. */
+.message.notice {
+  align-self: center;
+  max-width: 90%;
+  font-size: 13px;
+  text-align: center;
+  color: var(--muted);
+  background: none;
+  border: 1px dashed var(--border);
+}
+
+.composer {
+  display: flex;
+  gap: 10px;
+  padding: 16px 24px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.input {
+  flex: 1;
+  padding: 11px 14px;
+  font: inherit;
+  color: inherit;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.input:focus {
+  outline: 2px solid var(--user-bg);
+  outline-offset: -1px;
+}
+
+.send {
+  padding: 11px 20px;
+  font: inherit;
+  font-weight: 500;
+  color: var(--user-text);
+  background: var(--user-bg);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.send:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Narrow viewports: the sidebar becomes a short scrollable strip above the chat rather
+   than squeezing it to nothing. */
+@media (max-width: 720px) {
+  .shell {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: auto;
+    max-height: 30dvh;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #17171a;
+    --surface: #1f1f23;
+    --border: #33333a;
+    --text: #ececee;
+    --muted: #9a9aa3;
+    --user-bg: #e8e8ec;
+    --user-text: #17171a;
+    --error: #ff9d94;
+  }
+
+  .message.error {
+    background: #3a1f1d;
+    border-color: #5c2f2b;
+  }
+}

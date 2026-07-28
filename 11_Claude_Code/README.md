@@ -66,7 +66,13 @@ While scaffolding in Task 3 you used **plan mode** before letting Claude Code wr
 
 #### ✅ Answer
 
-_(insert your answer here)_
+Because an agent *acts* rather than suggests. A chat model's worst output is wrong text I can ignore; an agent's worst output is a real side effect on a real filesystem, executed with my privileges. The model is probabilistic, but `rm` is not reversible. A permission system inserts a human at exactly the moments that can't be undone, which converts "discover the mistake afterwards" into "veto it beforehand."
+
+Plan mode matters most from an empty directory because there is nothing to constrain the agent and nothing to correct it against. In an existing repo, conventions are legible in the code and a bad change shows up as a diff against something that worked. From empty, every decision is unconstrained — dependency manager, framework, file layout, where the reply logic lives — and each one becomes load-bearing for everything built afterwards. The cost curve is steepest at the start: agreeing "the stub is isolated in one swappable function" costs one sentence in a plan, and a refactor if discovered later.
+
+My own build proves the point. The plan for the skeleton specified an `async` `generate_reply` that accepts an unused `conversation_id`. Both looked like over-engineering for an echo stub. Because they were agreed up front, wiring in the real agent (Task 6) was a change to one function body, and conversation memory (Task 7) needed no signature change at all.
+
+Plan mode has a second benefit I didn't expect: it makes reasoning checkable. My Task 8 plan claimed a custom tool would reduce turns and cost. Because the claim was written down, I measured it — and it was wrong (identical turn count, higher cost). Stated in a plan, a bad assumption gets tested. Buried in code, it just becomes folklore.
 
 ### ❓ Question #2
 
@@ -74,7 +80,17 @@ _(insert your answer here)_
 
 #### ✅ Answer
 
-_(insert your answer here)_
+What belongs is everything a fresh session cannot derive by reading the code: how to run and test the thing, the one architectural decision that matters, why deliberately odd-looking code is deliberate, and facts that were expensive to learn and contradict expectations. What doesn't belong is anything a `Read` would reveal, long prose, aspirations, and anything that has quietly become false.
+
+I saw the payoff immediately. My very first `query()` against the project answered "what does this project do?" accurately with **zero tool calls** — the reply was essentially a paraphrase of my `CLAUDE.md`, which the harness had already loaded. A good `CLAUDE.md` doesn't just inform the agent, it removes work: no glob, no reads, fewer turns, less money.
+
+The load-bearing notes earned their place too. My file explained that `generate_reply` was `async` despite echoing needing no `await`, and that `conversation_id` was intentionally unused. Without that, the obvious "cleanup" would have deleted exactly the hooks the SDK needed.
+
+The failure mode is staleness, and I hit it repeatedly. My file described wiring in the agent as future work minutes after the agent was wired in. The UI header still announced "Echo stub" while a live agent answered questions beneath it. Every line is a liability that has to be maintained, which is the real argument for keeping it short.
+
+The sharpest lesson: **a convention the code visibly violates is worse than no convention.** Mine said replies contain no markdown, while replies were shipping bullet lists. That doesn't just fail — it teaches the next reader to distrust the whole file.
+
+This is Session 3's finite-context problem from the other end. `/compact` reclaims context *after* it fills; `CLAUDE.md` is a tax paid *before* anything starts, on every future session forever. Both are the same decision — what's worth keeping versus rediscovering — and the same tradeoff I made building summarization middleware. The difference is that summarization decays automatically while `CLAUDE.md` decays silently, so pruning has to be deliberate.
 
 ### ❓ Question #3
 
@@ -82,7 +98,20 @@ The Agent SDK gives you the same agent loop that powers Claude Code. Compare thi
 
 #### ✅ Answer
 
-_(insert your answer here)_
+**Free:** the loop itself, production file and search tools, retries, context compaction, MCP client support, and session persistence. The scale of that last one is easy to miss. Conversation memory (Task 7) was about ten lines — a dict mapping my `conversation_id` to the SDK's `session_id`. I never stored a single message. The harness keeps transcripts on disk; I keep a 36-character ticket stub. In LangGraph I'd have built a checkpointer, chosen a store, and serialized state myself.
+
+**Given up:** model provider choice, arbitrary graph topologies — and one cost I didn't anticipate, which turned out to be the expensive one.
+
+**I gave up legibility of the control surface.** In a hand-built loop, the tools the model has are the tools I passed it; I can read the dispatch code and know. With the SDK I couldn't, and the documentation actively misled me:
+
+- `allowed_tools` reads like a whitelist. It isn't — it's an auto-approve list. With `allowed_tools=["Read","Glob","Grep"]` the agent successfully ran `Bash`.
+- `permission_mode="dontAsk"` documents itself as denying anything not pre-approved. It didn't.
+- `can_use_tool` raises at runtime unless the prompt is an async iterable — a constraint invisible until you try it.
+- The set of tools offered changed depending on an environment variable, so a one-off enumeration was already wrong.
+
+Four documented mechanisms, one of which (`disallowed_tools`) actually worked, and the only way to find out was empirical probing. That's the real trade: the SDK's loop is battle-tested, but its behavior is something I *test for* rather than *read*. A hand-built loop is more work and less capable, and I would have known exactly what it could do.
+
+The other structural difference: **defaults run opposite directions.** A LangGraph loop starts with zero tools and I add what's needed. The SDK starts by offering 25+ — `Bash`, `Write`, `Workflow`, `CronCreate`, `WebFetch` — and expects me to subtract. Additive defaults fail closed; subtractive defaults fail open.
 
 ### ❓ Question #4
 
@@ -90,7 +119,26 @@ Your chat app could have called a chat completions API directly, the way you did
 
 #### ✅ Answer
 
-_(insert your answer here)_
+**What I gain:** a completion can only discuss a repository I already put in the prompt. `query()` gets an agent that assembles its own context — globbing the tree, grepping for entry points, reading what looks relevant, iterating until it can answer. I never told it which files to read. Answering "what's the largest file in `app/`?" over an arbitrary repo isn't a prompt-engineering problem; it needs a loop with real tools.
+
+**What's new:** side effects. A completion's worst case is confidently wrong text. An agent's tool calls hit a real filesystem with the server's privileges, steered by untrusted input from a public textbox. Two distinct risks: **exfiltration** — reading anything reachable and printing it into a chat reply — and **mutation or execution**.
+
+**How my controls addressed them — including where I was wrong.**
+
+I began with `allowed_tools=["Read","Glob","Grep"]`, `cwd`, and `max_turns=25`, and wrote in my `CLAUDE.md` that the agent "structurally cannot modify anything." Then I tested it, and that was false.
+
+With exactly that configuration the agent ran `Bash`. I confirmed it with a command whose output it couldn't fabricate (`openssl rand -hex 12`) and watched the hex string come back. `permission_mode="dontAsk"` didn't stop it either. My earlier "proof" of read-only — the agent politely declining to delete `README.md` — proved nothing: that refusal came from `system_prompt` personality, not absent capability. **An agent's refusal is evidence about its manners, not its permissions.**
+
+What actually works is `disallowed_tools`: those tools are never offered to the model at all. Verified — `Bash` absent from the init message's tool list, no tool calls attempted, no output produced.
+
+Two further findings:
+
+1. **`cwd` does not sandbox custom tools.** It confines the built-ins, but my `repo_stats` tool is ordinary Python in my own process, so the SDK cannot restrain it. Handed `path="../.."` it would have walked straight out of the repo. It resolves paths first and then requires containment in `TARGET_REPO`; `..`, absolute paths, and escaping symlinks are all refused. Every custom tool is a potential hole in your own sandbox.
+2. **Blocklists rot faster than you'd think.** I enumerated the toolset and denied everything unnecessary — then a runtime warning I'd added caught `TaskCreate`/`TaskGet`/`TaskList`/`TaskUpdate` on the first real run, because the shell I enumerated in had `CLAUDE_CODE_ENABLE_TASKS=0`. Not an SDK upgrade. A different terminal.
+
+**Residual risk I'm accepting:** the agent can still read anything inside `TARGET_REPO`, including a committed `.env`. `cwd` is the only scope, and for a localhost project that's a reasonable call — but it's a decision, not a guarantee.
+
+The lesson worth more than the code: the boundary I could *describe* was not the boundary that *existed*, and nothing short of probing distinguished them.
 
 ## Activity 1: Level Up the Chat App
 

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Chat</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <button id="new-chat" class="new-chat" type="button">+ New chat</button>
+        <ul id="conversations" class="conversations" aria-label="Conversations"></ul>
+      </aside>
+
+      <div class="app">
+        <header class="header">
+          <h1>Chat</h1>
+          <p class="subtitle">Codebase concierge &mdash; ask about the code, read-only.</p>
+        </header>
+
+        <main id="messages" class="messages" aria-live="polite"></main>
+
+        <form id="composer" class="composer" autocomplete="off">
+          <input
+            id="input"
+            class="input"
+            type="text"
+            name="message"
+            placeholder="Send a message&hellip;"
+            aria-label="Message"
+            required
+          />
+          <button id="send" class="send" type="submit">Send</button>
+        </form>
+      </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
