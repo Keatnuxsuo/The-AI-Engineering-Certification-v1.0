@@ -9,7 +9,7 @@
 
 | 📰 Session Sheet | ⏺️ Recording | 🖼️ Slides | 👨‍💻 Repo | 📝 Homework | 📁 Feedback |
 |:-----------------|:-------------|:----------|:----------|:------------|:------------|
-| Session 16: RLVR | Recording | Slides | You are here! | Homework | Feedback |
+| [Session 16: RLVR](https://github.com/AI-Maker-Space/The-AI-Engineering-Certification-v1.0/tree/main/00_Docs/Modules/16_RLVR) |[Recording!](https://us02web.zoom.us/rec/share/nFLWt0guwrpQI6LxPS91qr6j1eeI9csKjj7oub5P4gQc86V-2Uedr3rvuS_JAdhx.2RxM5BRGjmn6DwX0) <br> passcode: `1Suw?vDP`| [Session 16 Slides](https://canva.link/l8691ralz271ogr) | You are here! | [Session 16 Assignment](https://forms.gle/sAhcKBmd4UqgooPG6) | [Feedback 7/23](https://forms.gle/BnDW3TnRZTCXyK4h8) |
 
 ## Main Assignment
 
