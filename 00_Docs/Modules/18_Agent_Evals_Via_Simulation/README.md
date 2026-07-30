@@ -15,6 +15,16 @@
 
 - [Demystifying evals for AI agents](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents), by Anthropic (Jan 2026)
 - [Evaluation concepts](https://docs.langchain.com/langsmith/evaluation-concepts), by LangChain
+- [τ-bench](https://arxiv.org/abs/2406.12045) (Yao, Shinn, Razavi, Narasimhan — 2024)
+  
+"Existing benchmarks do not test language agents on their interaction with human users or ability to follow domain-specific rules, both of which are vital for deploying them in real world applications."
+- [τ²-Bench](https://arxiv.org/abs/2506.07982) (Barres, Dong, Ray, Si, Narasimhan — 2025)
+  
+"Existing benchmarks do not test language agents on their interaction with human users or ability to follow domain-specific rules, both of which are vital for deploying them in real world applications."
+- [Tau2-Infinity](https://vibrantlabs.com/research/tau2-infinity) (Vibrant Labs (creators of RAGAS) — 2026)
+  
+"The bottleneck for building better tool-use agents is not algorithm design; it’s post-training data quality and quantity."
+
 
 ## 🗺️ Session Overview
 
